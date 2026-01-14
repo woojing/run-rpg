@@ -1,13 +1,6 @@
 import { Strategy } from '../ai/Strategy.js'
 import { Enemy } from '../entities/Enemy.js'
 
-// Forward declaration
-export interface EnemyArchetype {
-  RUSHER: string
-  SNIPER: string
-  ELITE: string
-}
-
 export interface TelemetryData {
   // Strategy usage
   strategyTime: { [key in Strategy]: number } // ms spent in each
@@ -106,8 +99,14 @@ export class Telemetry {
   }
 
   recordKill(enemy: Enemy, timeOfDeath: number) {
-    // For now, all enemies are Rushers (will be updated in C7)
-    this.data.killsByArchetype['Rusher']++
+    // Read archetype from enemy (Rusher/Sniper/Elite)
+    const archName = enemy.archetype.charAt(0).toUpperCase() + enemy.archetype.slice(1)
+    this.data.killsByArchetype[archName]++
+
+    // Track sniper kill times for performance metric
+    if (enemy.archetype === 'sniper') {
+      this.sniperKillTimes.push(timeOfDeath)
+    }
   }
 
   recordBurstActivation() {

@@ -2,9 +2,14 @@ import Phaser from 'phaser'
 import { SCENE_KEYS } from '../constants.js'
 import { TelemetryData } from '../systems/Telemetry.js'
 import { Strategy } from '../ai/Strategy.js'
+import { GrowthResolver, GrowthResult } from '../systems/GrowthResolver.js'
+import { RunRecorder } from '../systems/RunRecorder.js'
+import { TRAITS } from '../data/growthTraits.js'
 
 export default class SummaryScene extends Phaser.Scene {
   telemetry!: TelemetryData
+  growthResult!: GrowthResult
+  runRecorder!: RunRecorder
 
   constructor() {
     super({ key: SCENE_KEYS.SUMMARY })
@@ -12,6 +17,17 @@ export default class SummaryScene extends Phaser.Scene {
 
   init(data: { telemetry: TelemetryData }) {
     this.telemetry = data.telemetry
+    this.runRecorder = new RunRecorder()
+
+    // Resolve profile and traits
+    const resolver = new GrowthResolver()
+    this.growthResult = resolver.resolve(this.telemetry)
+
+    console.log('SummaryScene: Profile', this.growthResult.profile)
+    console.log('SummaryScene: Traits', this.growthResult.grantedTraits)
+
+    // Save traits to persistent storage
+    this.runRecorder.saveRun(this.telemetry, this.growthResult.profile.profileName, this.growthResult.grantedTraits)
   }
 
   create() {
@@ -79,8 +95,11 @@ export default class SummaryScene extends Phaser.Scene {
       'Burst Activations': this.telemetry.burstActivations.toString()
     })
 
+    // Growth section - Profile and Traits
+    this.displayGrowthSection(560)
+
     // Restart button
-    const restartBtn = this.createButton(960, 900, 300, 80, 'NEXT RUN', 0x33ff33)
+    const restartBtn = this.createButton(960, 920, 300, 80, 'NEXT RUN', 0x33ff33)
     restartBtn.on('pointerdown', () => {
       this.scene.start(SCENE_KEYS.BATTLE)
     })
@@ -101,6 +120,147 @@ export default class SummaryScene extends Phaser.Scene {
     })
 
     console.log('SummaryScene: Display complete')
+  }
+
+  /**
+   * Display growth section with profile bars and granted traits
+   */
+  private displayGrowthSection(y: number) {
+    // Section title
+    const title = this.add.text(960, y, 'GROWTH ANALYSIS', {
+      fontSize: '36px',
+      color: '#ffff00',
+      fontStyle: 'bold'
+    })
+    title.setOrigin(0.5)
+
+    // Profile name
+    const profileName = this.add.text(960, y + 45, this.growthResult.profile.profileName, {
+      fontSize: '28px',
+      color: '#33ff33',
+      fontStyle: 'bold'
+    })
+    profileName.setOrigin(0.5)
+
+    // Profile bars
+    const barY = y + 80
+    const barWidth = 200
+    const barHeight = 20
+    const barSpacing = 50
+
+    // Dodge bar
+    this.displayProfileBar(400, barY, 'Dodge', this.growthResult.profile.dodgeScore, 0x3333ff)
+    // Aggression bar
+    this.displayProfileBar(960, barY, 'Aggression', this.growthResult.profile.aggressionScore, 0xff3333)
+    // Defense bar
+    this.displayProfileBar(1520, barY, 'Defense', this.growthResult.profile.defenseScore, 0x33ff33)
+
+    // Traits section
+    const traitsY = barY + 80
+    const traitsTitle = this.add.text(960, traitsY, `TRAITS GRANTED (${this.growthResult.grantedTraits.length})`, {
+      fontSize: '28px',
+      color: '#ffff00',
+      fontStyle: 'bold'
+    })
+    traitsTitle.setOrigin(0.5)
+
+    // Trait cards
+    const traitStartY = traitsY + 50
+    const traitCardWidth = 380
+    const traitCardHeight = 100
+    const traitSpacing = 20
+
+    this.growthResult.grantedTraits.forEach((traitId, index) => {
+      const trait = TRAITS[traitId]
+      if (!trait) return
+
+      // Calculate position (2 columns)
+      const col = index % 2
+      const row = Math.floor(index / 2)
+      const x = 485 + col * (traitCardWidth + traitSpacing)
+      const y = traitStartY + row * (traitCardHeight + traitSpacing)
+
+      this.displayTraitCard(x, y, traitCardWidth, traitCardHeight, trait)
+    })
+
+    // Explanations
+    const explanationY = traitStartY + Math.ceil(this.growthResult.grantedTraits.length / 2) * (traitCardHeight + traitSpacing) + 20
+
+    if (this.growthResult.explanations.length > 0) {
+      const explanationTitle = this.add.text(960, explanationY, 'WHY THESE TRAITS?', {
+        fontSize: '24px',
+        color: '#aaaaaa',
+        fontStyle: 'bold'
+      })
+      explanationTitle.setOrigin(0.5)
+
+      const explanationsText = this.growthResult.explanations.join('\n')
+      const explanations = this.add.text(960, explanationY + 35, explanationsText, {
+        fontSize: '18px',
+        color: '#888888',
+        align: 'center'
+      })
+      explanations.setOrigin(0.5)
+    }
+  }
+
+  /**
+   * Display a profile bar
+   */
+  private displayProfileBar(x: number, y: number, label: string, score: number, color: number) {
+    // Label
+    const labelText = this.add.text(x, y - 15, label, {
+      fontSize: '20px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    })
+    labelText.setOrigin(0.5)
+
+    // Background bar
+    const bgBar = this.add.rectangle(x, y, barWidth, barHeight, 0x333333)
+    bgBar.setOrigin(0.5)
+
+    // Fill bar
+    const fillWidth = (score / 100) * barWidth
+    const fillBar = this.add.rectangle(x - barWidth / 2 + fillWidth / 2, y, fillWidth, barHeight, color)
+    fillBar.setOrigin(0.5)
+
+    // Score text
+    const scoreText = this.add.text(x, y + barHeight / 2 + 20, `${score}`, {
+      fontSize: '18px',
+      color: '#ffffff'
+    })
+    scoreText.setOrigin(0.5)
+  }
+
+  /**
+   * Display a trait card
+   */
+  private displayTraitCard(x: number, y: number, width: number, height: number, trait: any) {
+    // Card background
+    const bg = this.add.rectangle(x, y, width, height, 0x1a1a2e)
+    bg.setOrigin(0.5)
+
+    // Card border
+    const border = this.add.rectangle(x, y, width, height, 0x4444ff)
+    border.setOrigin(0.5)
+    border.setStrokeStyle(2, 0x4444ff)
+
+    // Trait name
+    const nameText = this.add.text(x - width / 2 + 10, y - height / 2 + 10, trait.name, {
+      fontSize: '20px',
+      color: '#ffff00',
+      fontStyle: 'bold'
+    })
+
+    // Trait description
+    const descText = this.add.text(x, y + 10, trait.description, {
+      fontSize: '16px',
+      color: '#ffffff',
+      align: 'center',
+      wordWrap: { width: width - 20 }
+    })
+    descText.setOrigin(0.5)
   }
 
   private displayStatColumn(x: number, y: number, title: string, stats: { [key: string]: string }) {

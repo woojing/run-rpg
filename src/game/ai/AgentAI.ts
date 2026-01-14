@@ -201,7 +201,10 @@ export class AgentAI {
 
     // Quick dash toward target
     const angle = Phaser.Math.Angle.Between(agent.x, agent.y, target.x, target.y)
-    const velocity = Phaser.Physics.Arcade.velocityFromRotation(angle, 420) // Dash speed
+    const velocity = {
+      x: Math.cos(angle) * 420, // Dash speed
+      y: Math.sin(angle) * 420
+    }
 
     const body = agent.body as Phaser.Physics.Arcade.Body
     body.setVelocity(velocity.x, velocity.y)
@@ -222,7 +225,10 @@ export class AgentAI {
     if (!nearest) return
 
     const angle = Phaser.Math.Angle.Between(nearest.x, nearest.y, agent.x, agent.y)
-    const velocity = Phaser.Physics.Arcade.velocityFromRotation(angle, 520) // Faster dash
+    const velocity = {
+      x: Math.cos(angle) * 520, // Faster dash
+      y: Math.sin(angle) * 520
+    }
 
     const body = agent.body as Phaser.Physics.Arcade.Body
     body.setVelocity(velocity.x, velocity.y)

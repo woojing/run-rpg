@@ -20,15 +20,48 @@ export class Agent extends Phaser.GameObjects.Container {
 
   // Special states
   invulnerable: boolean = false // For evade i-frames
+  postEvadeTimer: number = 0 // For post-evade trait effects
+
+  // Traits system
+  activeTraits: Set<string> = new Set()
+  traitModifiers: {
+    // T1 PhantomTrace
+    phantomTraceActive: boolean
+    // T2 ReflexBurst
+    reflexBurstActive: boolean
+    // T3 OverclockCharge
+    engageDashBonus: number
+    knockbackBonus: number
+    // T4 BloodExchange
+    lifestealPercent: number
+    // T5 AdaptiveShield
+    guardBonus: boolean
+    // T6 ThreatRedirect
+    threatRedirectActive: boolean
+  }
 
   // Visual
   graphics!: Phaser.GameObjects.Graphics
   hpBar!: Phaser.GameObjects.Graphics
 
-  constructor(scene: Phaser.Scene, x: number, y: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, initialTraits: string[] = []) {
     super(scene, x, y)
     this.scene.add.existing(this)
     this.scene.physics.add.existing(this)
+
+    // Initialize trait modifiers
+    this.traitModifiers = {
+      phantomTraceActive: false,
+      reflexBurstActive: false,
+      engageDashBonus: 0,
+      knockbackBonus: 0,
+      lifestealPercent: 0,
+      guardBonus: false,
+      threatRedirectActive: false
+    }
+
+    // Apply initial traits
+    initialTraits.forEach(traitId => this.applyTrait(traitId))
 
     // Setup physics body
     const body = this.body as Phaser.Physics.Arcade.Body
@@ -79,8 +112,15 @@ export class Agent extends Phaser.GameObjects.Container {
   takeDamage(amount: number) {
     if (this.invulnerable) return
 
-    // Apply damage reduction (from GUARD strategy)
-    const reducedAmount = amount * (1 - this.damageReduction)
+    // Apply damage reduction
+    let finalReduction = this.damageReduction
+
+    // T1 PhantomTrace: Additional damage reduction in post-evade window
+    if (this.traitModifiers.phantomTraceActive && this.postEvadeTimer > 0) {
+      finalReduction += 0.5 // Additional 50% reduction
+    }
+
+    const reducedAmount = amount * (1 - finalReduction)
     this.hp -= reducedAmount
 
     // Emit event for telemetry
@@ -122,15 +162,48 @@ export class Agent extends Phaser.GameObjects.Container {
       onComplete: () => attackCircle.destroy()
     })
 
+    // T2 ReflexBurst: Post-evade damage bonus
+    let attackDamageMultiplier = this.damageMultiplier
+    if (this.traitModifiers.reflexBurstActive && this.postEvadeTimer > 0) {
+      attackDamageMultiplier += 0.4 // Additional 40% damage
+
+      // Consume the post-evade window (one-time bonus)
+      this.postEvadeTimer = 0
+    }
+
     // Deal damage to enemies in range
     enemies.forEach(enemy => {
       if (!enemy.active) return
 
       const dist = Phaser.Math.Distance.Between(this.x, this.y, enemy.x, enemy.y)
       if (dist <= this.attackRange + enemy.getRadius()) {
-        // Apply damage multiplier (from BURST strategy)
-        const finalDamage = this.damage * this.damageMultiplier
+        // Apply damage multiplier (from BURST strategy + traits)
+        const finalDamage = this.damage * attackDamageMultiplier
         enemy.takeDamage(finalDamage)
+
+        // T4 BloodExchange: Lifesteal
+        if (this.traitModifiers.lifestealPercent > 0) {
+          const healAmount = finalDamage * this.traitModifiers.lifestealPercent
+          this.heal(healAmount)
+        }
+      }
+    })
+  }
+
+  heal(amount: number) {
+    this.hp = Math.min(this.hp + amount, this.maxHp)
+    this.updateHpBar()
+
+    // Visual feedback - flash green
+    this.scene.tweens.add({
+      targets: this.graphics,
+      alpha: 0.5,
+      duration: 50,
+      yoyo: true,
+      onYoyo: () => {
+        this.graphics.clear()
+        this.graphics.fillStyle(COLORS.agent, 1)
+        this.graphics.fillCircle(0, 0, 40)
       }
     })
   }
@@ -140,6 +213,103 @@ export class Agent extends Phaser.GameObjects.Container {
     if (this.attackCooldown > 0) {
       this.attackCooldown -= delta
     }
+
+    // Reduce post-evade timer
+    if (this.postEvadeTimer > 0) {
+      this.postEvadeTimer -= delta
+    }
+  }
+
+  // ========== TRAIT SYSTEM ==========
+
+  /**
+   * Apply a trait to this agent
+   */
+  applyTrait(traitId: string) {
+    if (this.activeTraits.has(traitId)) return // Already has this trait
+
+    this.activeTraits.add(traitId)
+
+    switch (traitId) {
+      case 'T1_PHANTOM_TRACE':
+        this.traitModifiers.phantomTraceActive = true
+        break
+
+      case 'T2_REFLEX_BURST':
+        this.traitModifiers.reflexBurstActive = true
+        break
+
+      case 'T3_OVERCLOCK_CHARGE':
+        this.traitModifiers.engageDashBonus = 0.25 // 25% bonus
+        this.traitModifiers.knockbackBonus = 0.2 // 20% bonus
+        break
+
+      case 'T4_BLOOD_EXCHANGE':
+        this.traitModifiers.lifestealPercent = 0.03 // 3% lifesteal
+        break
+
+      case 'T5_ADAPTIVE_SHIELD':
+        this.traitModifiers.guardBonus = true
+        break
+
+      case 'T6_THREAT_REDIRECT':
+        this.traitModifiers.threatRedirectActive = true
+        break
+    }
+
+    console.log(`Agent: Applied trait ${traitId}`)
+  }
+
+  /**
+   * Remove a trait from this agent
+   */
+  removeTrait(traitId: string) {
+    if (!this.activeTraits.has(traitId)) return
+
+    this.activeTraits.delete(traitId)
+
+    switch (traitId) {
+      case 'T1_PHANTOM_TRACE':
+        this.traitModifiers.phantomTraceActive = false
+        break
+
+      case 'T2_REFLEX_BURST':
+        this.traitModifiers.reflexBurstActive = false
+        break
+
+      case 'T3_OVERCLOCK_CHARGE':
+        this.traitModifiers.engageDashBonus = 0
+        this.traitModifiers.knockbackBonus = 0
+        break
+
+      case 'T4_BLOOD_EXCHANGE':
+        this.traitModifiers.lifestealPercent = 0
+        break
+
+      case 'T5_ADAPTIVE_SHIELD':
+        this.traitModifiers.guardBonus = false
+        break
+
+      case 'T6_THREAT_REDIRECT':
+        this.traitModifiers.threatRedirectActive = false
+        break
+    }
+
+    console.log(`Agent: Removed trait ${traitId}`)
+  }
+
+  /**
+   * Check if agent has a specific trait
+   */
+  hasTrait(traitId: string): boolean {
+    return this.activeTraits.has(traitId)
+  }
+
+  /**
+   * Set post-evade window (for trait effects)
+   */
+  setPostEvadeWindow(duration: number) {
+    this.postEvadeTimer = duration
   }
 
   private die() {
