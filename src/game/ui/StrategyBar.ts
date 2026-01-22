@@ -134,9 +134,9 @@ export class StrategyBar {
   private setupKeyboardShortcuts() {
     const keyboard = this.scene.input.keyboard!
 
-    keyboard.on('key-ONE', () => this.setStrategy(Strategy.ENGAGE))
-    keyboard.on('key-TWO', () => this.setStrategy(Strategy.GUARD))
-    keyboard.on('key-THREE', () => this.setStrategy(Strategy.EVADE))
-    keyboard.on('key-FOUR', () => this.setStrategy(Strategy.BURST))
+    keyboard.on('keydown-ONE', () => this.setStrategy(Strategy.ENGAGE))
+    keyboard.on('keydown-TWO', () => this.setStrategy(Strategy.GUARD))
+    keyboard.on('keydown-THREE', () => this.setStrategy(Strategy.EVADE))
+    keyboard.on('keydown-FOUR', () => this.setStrategy(Strategy.BURST))
   }
 }
