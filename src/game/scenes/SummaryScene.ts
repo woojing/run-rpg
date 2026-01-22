@@ -208,6 +208,9 @@ export default class SummaryScene extends Phaser.Scene {
    * Display a profile bar
    */
   private displayProfileBar(x: number, y: number, label: string, score: number, color: number) {
+    const barWidth = 200
+    const barHeight = 20
+
     // Label
     const labelText = this.add.text(x, y - 15, label, {
       fontSize: '20px',
