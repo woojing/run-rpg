@@ -152,6 +152,29 @@ describe('Telemetry', () => {
       expect(telemetry.data.killsByArchetype['Sniper']).toBe(1)
       expect(telemetry.data.killsByArchetype['Elite']).toBe(1)
     })
+
+    it('should handle undefined archetype gracefully', () => {
+      const enemyWithoutArchetype = { archetype: undefined } as any
+
+      // Should not throw error
+      expect(() => {
+        telemetry.recordKill(enemyWithoutArchetype, 5000)
+      }).not.toThrow()
+
+      expect(telemetry.data.killsByArchetype['Unknown']).toBe(1)
+    })
+
+    it('should handle empty string archetype', () => {
+      const enemyWithEmptyArchetype = { archetype: '' } as any
+
+      // Should not throw error
+      expect(() => {
+        telemetry.recordKill(enemyWithEmptyArchetype, 5000)
+      }).not.toThrow()
+
+      // Empty string becomes 'Unknown'
+      expect(telemetry.data.killsByArchetype['Unknown']).toBe(1)
+    })
   })
 
   describe('recordBurstActivation', () => {

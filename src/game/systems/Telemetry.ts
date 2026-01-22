@@ -56,7 +56,8 @@ export class Telemetry {
       killsByArchetype: {
         'Rusher': 0,
         'Sniper': 0,
-        'Elite': 0
+        'Elite': 0,
+        'Unknown': 0
       },
       burstActivations: 0,
       sniperKillTimeAvg: 0,
@@ -100,7 +101,9 @@ export class Telemetry {
 
   recordKill(enemy: Enemy, timeOfDeath: number) {
     // Read archetype from enemy (Rusher/Sniper/Elite)
-    const archName = enemy.archetype.charAt(0).toUpperCase() + enemy.archetype.slice(1)
+    // Guard against undefined archetype
+    const archetype = enemy.archetype || 'unknown'
+    const archName = archetype.charAt(0).toUpperCase() + archetype.slice(1)
     this.data.killsByArchetype[archName]++
 
     // Track sniper kill times for performance metric
