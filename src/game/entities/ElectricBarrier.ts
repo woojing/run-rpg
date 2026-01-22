@@ -147,6 +147,9 @@ export class ElectricBarrier extends Phaser.GameObjects.Container {
    */
   update(delta: number, agent: Agent) {
     if (!this.isActive) return
+    if (!this.scene?.physics) return
+    if (!this.damageZone?.body) return
+    if (!agent?.body) return
 
     const zoneBody = this.damageZone.body as Phaser.Physics.Arcade.Body
     const agentBody = agent.body as Phaser.Physics.Arcade.Body
