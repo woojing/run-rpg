@@ -9,16 +9,20 @@ export default defineConfig({
     }
   },
   test: {
-    // Use jsdom environment for Phaser HEADLESS support
-    environment: 'jsdom',
+    // Use happy-dom environment for unit tests
+    environment: 'happy-dom',
 
     // Global setup for Phaser mocks
     setupFiles: ['./tests/setup.ts'],
 
-    // Test file patterns
+    // Test file patterns - exclude integration tests by default
     include: [
-      'tests/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+      'tests/unit/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
       'src/**/__tests__/**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
+    ],
+    exclude: [
+      'tests/integration/**',
+      '**/node_modules/**'
     ],
 
     // Coverage configuration
@@ -32,6 +36,28 @@ export default defineConfig({
         '**/*.spec.ts',
         'src/main.ts'
       ]
+    }
+  }
+})
+
+// Separate config for browser mode integration tests
+export const browserConfig = defineConfig({
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    }
+  },
+  test: {
+    include: [
+      'tests/integration/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
+    ],
+    exclude: [
+      'tests/unit/**',
+      '**/node_modules/**'
+    ],
+    browser: {
+      enabled: true,
+      headless: true
     }
   }
 })

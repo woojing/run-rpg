@@ -1,4 +1,14 @@
 import { vi, beforeEach } from 'vitest'
+import { createCanvas } from 'canvas'
+
+// Setup canvas for Phaser HEADLESS mode
+const canvas = createCanvas(1920, 1080)
+global.HTMLCanvasElement.prototype.getContext = vi.fn((contextType: string) => {
+  if (contextType === '2d') {
+    return canvas.getContext('2d')
+  }
+  return null
+}) as any
 
 // Mock localStorage for all tests
 const localStorageMock = {
